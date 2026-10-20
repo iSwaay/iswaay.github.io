@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-15T13:54:57.890Z",
+  "updatedAt": "2026-10-20T07:45:06.431Z",
   "botHours": {
     "start": "08:00",
     "end": "20:00"
@@ -33,6 +33,26 @@
     },
     "2026-10-15": {
       "profit": 367
+    },
+    "2026-10-16": {
+      "closed": false,
+      "profit": 243.96,
+      "deposit": 0,
+      "withdraw": 0,
+      "buyOpen": 0,
+      "buyClosed": 0,
+      "sellOpen": 0,
+      "sellClosed": 0
+    },
+    "2026-10-19": {
+      "closed": false,
+      "profit": 403.39,
+      "deposit": 0,
+      "withdraw": 0,
+      "buyOpen": 0,
+      "buyClosed": 0,
+      "sellOpen": 0,
+      "sellClosed": 0
     }
   }
 }
