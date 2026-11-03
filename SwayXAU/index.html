@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   :root { --bg:#0a1322; --rail:#0d1729; --card:#121e36; --line:#1f2e4d; --cell:#101b30; --txt:#e6ecf7; --mut:#8394b3; --green:#34d399; --red:#f87171; --blue:#5b8def; }
   html, body { background: var(--bg); color: var(--txt); font-family: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; }
@@ -15,12 +16,24 @@
   .card { background: var(--card); border: 1px solid var(--line); border-radius: .9rem; }
   .pos { color: var(--green); } .neg { color: var(--red); }
 
+  /* Widgets repliables */
+  .wgt-h { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem 1rem; font-weight: 800; font-size: .95rem; text-align: left; color: var(--txt); cursor: pointer; border-radius: .9rem; }
+  .wgt-h:hover { background: rgba(255,255,255,.03); }
+  .wgt-h .chev { width: 18px; height: 18px; color: var(--mut); transition: transform .2s; flex-shrink: 0; }
+  .wgt.closed .chev { transform: rotate(-90deg); }
+  .wgt-b { padding: 0 1rem 1rem; }
+  .wgt.closed .wgt-b { display: none; }
+  .wgt-b.calw { padding: 0 .75rem .9rem; }
+
   /* Cartes de statistiques */
   .stat { padding: .85rem 1rem; min-width: 0; }
   .stat .l { font-size: .78rem; color: var(--mut); font-weight: 500; }
-  .stat .v { font-weight: 800; font-size: 1.3rem; margin-top: .3rem; line-height: 1.2; }
-  .stat.big .v { font-size: 2rem; }
-  .stat .sub { font-size: .72rem; color: var(--mut); font-weight: 700; margin-left: .4rem; }
+  .stat .v { font-weight: 800; font-size: 1.2rem; margin-top: .3rem; line-height: 1.2; word-break: break-word; }
+  .stat.big .v { font-size: 1.75rem; }
+  .stat .eq { font-size: .75rem; color: var(--mut); font-weight: 700; margin-top: .25rem; }
+  .span2 { grid-column: span 2 / span 2; }
+  .stat.mini { background: var(--cell); }
+  .stat.mini .v { font-size: 1.05rem; }
 
   /* Boutons & champs */
   .btn { background: var(--card); border: 1px solid var(--line); border-radius: .6rem; padding: .45rem .8rem; font-size: .8rem; font-weight: 700; color: var(--txt); transition: .15s; }
@@ -35,7 +48,6 @@
   /* Barre latérale */
   .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; flex: 1; font-size: 11px; font-weight: 700; color: var(--mut); transition: .15s; cursor: pointer; }
   .nav-item svg { width: 22px; height: 22px; }
-  .nav-item small { font-size: 9px; color: #f5b94c; line-height: 1; }
   .nav-item:hover { color: #fff; }
   .nav-item.active { color: #fff; background: #17264a; }
   @media (min-width: 768px) { .nav-item { flex: none; padding: .8rem 0; margin: 0 .5rem; border-radius: .8rem; } }
@@ -45,8 +57,8 @@
   .cell { display: block; width: 100%; text-align: left; background: var(--cell); border: 1px solid var(--line); border-radius: .55rem; padding: .5rem .6rem; min-height: 84px; cursor: pointer; transition: .12s; font-family: inherit; color: var(--txt); }
   .cell:hover { border-color: #3a5a92; transform: translateY(-1px); }
   .cell .dn { font-size: .8rem; color: #9fb0cc; font-weight: 600; }
-  .cell .hrs, .cell .sub { font-size: 10.5px; color: #8fa3c4; font-weight: 500; line-height: 1.4; }
-  .cell .pv { font-size: .85rem; font-weight: 800; margin-top: .15rem; line-height: 1.25; }
+  .cell .sub { font-size: 10.5px; color: #8fa3c4; font-weight: 500; line-height: 1.4; }
+  .cell .pv { font-size: .8rem; font-weight: 800; margin-top: .15rem; line-height: 1.25; }
   .cell .pp { font-size: .7rem; font-weight: 700; }
   .cell .mf { font-size: .78rem; font-weight: 700; color: #8fa3c4; margin-top: .1rem; }
   .cell.win { background: #133a33; border-color: #1c5a48; } .cell.win .pv, .cell.win .pp { color: var(--green); }
@@ -55,6 +67,12 @@
   .cell.today { border-color: var(--blue); box-shadow: 0 0 0 1px rgba(91,141,239,.45); }
   .cell.today .dn { color: var(--blue); font-weight: 800; }
   @media (max-width: 639px) { .cal-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; } .dow-row, .empty-cell { display: none; } }
+
+  /* Gagnants / perdants */
+  .wl-bar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: #26385e; }
+  .wl-bar > div { transition: width .3s; }
+  .wl-strip { display: flex; flex-wrap: wrap; gap: 4px; }
+  .wl-strip i { display: block; width: 14px; height: 14px; border-radius: 4px; }
 
   /* Interrupteur */
   .sw { position: absolute; opacity: 0; }
@@ -75,10 +93,6 @@
   <button class="nav-item" data-nav="history">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
     <span>Historique</span>
-  </button>
-  <button class="nav-item" data-nav="live">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-    <span>Live</span><small>bientôt</small>
   </button>
   <button class="nav-item" data-nav="settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
@@ -115,66 +129,67 @@
 
   <!-- ============ SECTION HISTORIQUE ============ -->
   <section id="sec-history" class="space-y-3">
-    <div class="grid grid-cols-2 lg:grid-cols-6 gap-3">
-      <div class="card stat big col-span-2"><div class="l">Solde actuel</div><div class="v"><span id="st-bal">0,00 $</span><span id="st-bal-usc" class="sub">(0 USC)</span></div></div>
-      <div class="card stat big col-span-2"><div class="l">Bénéfice total</div><div id="st-profit" class="v">0,00 $</div></div>
-      <div class="card stat"><div class="l">Rendement sur dépôts</div><div id="st-ret" class="v">0,00 %</div></div>
-      <div class="card stat"><div class="l">Rendement composé</div><div id="st-comp" class="v">0,00 %</div></div>
 
-      <div class="card stat"><div class="l">Total déposé</div><div id="st-dep" class="v">0,00 $</div></div>
-      <div class="card stat"><div class="l">Total retiré</div><div id="st-wd" class="v">0,00 $</div></div>
-      <div class="card stat"><div class="l">Moyenne / jour</div><div id="st-avg" class="v">0,00 $</div></div>
-      <div class="card stat"><div class="l">Jours gagnants</div><div id="st-win" class="v">—</div></div>
-      <div class="card stat"><div class="l">Meilleur jour</div><div id="st-best" class="v">—</div></div>
-      <div class="card stat"><div class="l">Pire jour</div><div id="st-worst" class="v">—</div></div>
-
-      <div class="card stat"><div class="l">Heures d'activité</div><div id="st-hours" class="v">0,0 h</div></div>
-      <div class="card stat"><div class="l">Buy ouverts / fermés</div><div id="st-buy" class="v">0 / 0</div></div>
-      <div class="card stat"><div class="l">Sell ouverts / fermés</div><div id="st-sell" class="v">0 / 0</div></div>
+    <!-- Statistiques -->
+    <div class="card wgt" data-w="stats">
+      <button class="wgt-h" data-toggle="stats"><span>Statistiques</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="wgt-b"><div id="stats-grid" class="grid grid-cols-2 lg:grid-cols-6 gap-3"></div></div>
     </div>
 
     <!-- Calendrier -->
-    <div class="card p-3 sm:p-4">
-      <div class="flex items-center justify-between gap-3 mb-3">
-        <button id="prev" class="btn !px-2.5 !py-2" aria-label="Mois précédent"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
-        <div class="flex-1 flex flex-wrap items-center justify-between gap-x-4">
-          <h2 id="month-title" class="text-lg font-extrabold"></h2>
-          <span id="month-sum" class="text-sm font-bold"></span>
+    <div class="card wgt" data-w="calendar">
+      <button class="wgt-h" data-toggle="calendar"><span>Calendrier</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="wgt-b calw">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <button id="prev" class="btn !px-2.5 !py-2" aria-label="Mois précédent"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+          <div class="flex-1 flex flex-wrap items-center justify-between gap-x-4">
+            <h2 id="month-title" class="text-lg font-extrabold"></h2>
+            <span id="month-sum" class="text-sm font-bold"></span>
+          </div>
+          <button id="next" class="btn !px-2.5 !py-2" aria-label="Mois suivant"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
         </div>
-        <button id="next" class="btn !px-2.5 !py-2" aria-label="Mois suivant"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
-      </div>
 
-      <div class="flex flex-wrap items-center gap-2 mb-2">
-        <button id="btn-wk" class="btn">Marquer les week-ends du mois comme fermés</button>
-        <span class="text-xs font-semibold ml-1" style="color:var(--mut)">Horaires du bot</span>
-        <input id="bot-start" type="time" step="60" class="field !w-auto !py-1.5">
-        <span>→</span>
-        <input id="bot-end" type="time" step="60" class="field !w-auto !py-1.5">
-        <button id="btn-apply" class="btn">Appliquer aux jours ouvrés du mois</button>
-        <button id="btn-add" class="btn sm:ml-auto" style="border-color:#2f4f8f;color:#9dbcff">+ Dépôt / Retrait</button>
-      </div>
-      <p class="text-xs mb-3" style="color:var(--mut)">Trades dans chaque case : ouverts / fermés. Cliquez sur un jour pour le modifier.</p>
+        <div class="flex flex-wrap items-center gap-2 mb-2">
+          <button id="btn-wk" class="btn">Marquer les week-ends du mois comme fermés</button>
+          <button id="btn-add" class="btn sm:ml-auto" style="border-color:#2f4f8f;color:#9dbcff">+ Dépôt / Retrait</button>
+        </div>
+        <p class="text-xs mb-3" style="color:var(--mut)">Trades dans chaque case : ouverts / fermés. Cliquez sur un jour pour le modifier.</p>
 
-      <div class="grid grid-cols-7 gap-2 mb-2 dow-row">
-        <div class="dow">L</div><div class="dow">M</div><div class="dow">M</div><div class="dow">J</div><div class="dow">V</div><div class="dow">S</div><div class="dow">D</div>
+        <div class="grid grid-cols-7 gap-2 mb-2 dow-row">
+          <div class="dow">L</div><div class="dow">M</div><div class="dow">M</div><div class="dow">J</div><div class="dow">V</div><div class="dow">S</div><div class="dow">D</div>
+        </div>
+        <div id="grid" class="grid grid-cols-7 gap-2 cal-grid"></div>
       </div>
-      <div id="grid" class="grid grid-cols-7 gap-2 cal-grid"></div>
     </div>
-  </section>
 
-  <!-- ============ SECTION LIVE ============ -->
-  <section id="sec-live" class="hidden">
-    <div class="card p-8 sm:p-12 text-center max-w-2xl mx-auto mt-6">
-      <div class="mx-auto w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style="background:#17264a;color:var(--blue)">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-      </div>
-      <h2 class="text-xl font-extrabold mb-2">Live — bientôt disponible</h2>
-      <p class="text-sm" style="color:var(--mut)">Le suivi en temps réel de votre bot sera mis en place prochainement : positions ouvertes, bénéfice du jour, état du bot.</p>
-      <div class="grid grid-cols-3 gap-3 mt-6 opacity-50">
-        <div class="card stat"><div class="l">Positions</div><div class="v">—</div></div>
-        <div class="card stat"><div class="l">Bénéfice du jour</div><div class="v">—</div></div>
-        <div class="card stat"><div class="l">État du bot</div><div class="v">—</div></div>
-      </div>
+    <!-- Jours gagnants / perdants -->
+    <div class="card wgt" data-w="winloss">
+      <button class="wgt-h" data-toggle="winloss"><span>Jours gagnants / perdants</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="wgt-b"><div id="wl-body"></div></div>
+    </div>
+
+    <!-- Graphique solde -->
+    <div class="card wgt" data-w="balance">
+      <button class="wgt-h" data-toggle="balance"><span>Évolution du solde (USC)</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="wgt-b"><div class="relative h-64"><canvas id="ch-bal"></canvas></div></div>
+    </div>
+
+    <!-- Graphique bénéfice par jour -->
+    <div class="card wgt" data-w="daily">
+      <button class="wgt-h" data-toggle="daily"><span>Bénéfice par jour (USC)</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="wgt-b"><div class="relative h-64"><canvas id="ch-day"></canvas></div></div>
+    </div>
+
+    <!-- Graphique bénéfice par mois -->
+    <div class="card wgt" data-w="monthly">
+      <button class="wgt-h" data-toggle="monthly"><span>Bénéfice par mois (USC)</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="wgt-b"><div class="relative h-56"><canvas id="ch-month"></canvas></div></div>
+    </div>
+
+    <!-- Stats avancées -->
+    <div class="card wgt" data-w="adv">
+      <button class="wgt-h" data-toggle="adv"><span>Statistiques avancées</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="wgt-b"><div id="adv-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div></div>
     </div>
   </section>
 
@@ -184,8 +199,8 @@
       <h2 class="text-xl font-extrabold mb-1">Réglages</h2>
       <p class="text-xs mb-5" style="color:var(--mut)">Synchronisation GitHub — les réglages sont enregistrés automatiquement dans ce navigateur.</p>
       <div class="space-y-3.5">
-        <label class="lbl">Pseudo GitHub<input id="s-user" class="field" placeholder="AzurSeven" autocomplete="off"></label>
-        <label class="lbl">Nom du dépôt<input id="s-repo" class="field" placeholder="azurseven.github.io" autocomplete="off"></label>
+        <label class="lbl">Pseudo GitHub<input id="s-user" class="field" placeholder="iSwaay" autocomplete="off"></label>
+        <label class="lbl">Nom du dépôt<input id="s-repo" class="field" placeholder="iswaay.github.io" autocomplete="off"></label>
         <label class="lbl">Branche<input id="s-branch" class="field" placeholder="main" autocomplete="off"></label>
         <label class="lbl">Fichier de données<input id="s-file" class="field" placeholder="SwayXAU/data.json" autocomplete="off"></label>
         <label class="lbl">Token d'accès (fine-grained, Contents : lecture/écriture)
@@ -199,7 +214,14 @@
           <button id="btn-load" class="btn">↓ Recharger depuis GitHub</button>
           <button id="btn-save2" class="btn" style="border-color:#2f4f8f;color:#9dbcff">↑ Enregistrer sur GitHub</button>
         </div>
-        <p class="text-xs pt-2 border-t" style="color:var(--mut);border-color:var(--line)">Conversion : 100 USC = 1 $.</p>
+
+        <div class="pt-3 border-t" style="border-color:var(--line)">
+          <h3 class="text-sm font-extrabold mb-1">Widgets ouverts au démarrage</h3>
+          <p class="text-xs mb-3" style="color:var(--mut)">Coché = ouvert à l'ouverture du site. Vous pouvez toujours ouvrir/fermer un widget avec sa flèche.</p>
+          <div id="widget-opts" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div>
+        </div>
+
+        <p class="text-xs pt-2 border-t" style="color:var(--mut);border-color:var(--line)">Conversion : 100 USC = 1 $. Les dépôts et retraits se saisissent en $.</p>
       </div>
     </div>
   </section>
@@ -219,16 +241,12 @@
       <span id="d-closed-lbl" class="text-sm font-bold">Marché ouvert</span>
     </label>
     <div>
-      <label class="lbl">Bénéfice (USC)<input id="d-profit" type="number" step="any" inputmode="decimal" class="field" placeholder="ex : 506"></label>
+      <label class="lbl">Bénéfice (USC)<input id="d-profit" type="number" step="any" inputmode="decimal" class="field" placeholder="ex : 243.96"></label>
       <div id="d-prev" class="text-sm font-bold mt-1.5 min-h-[1.25rem]"></div>
     </div>
     <div class="grid grid-cols-2 gap-3">
       <label class="lbl">Dépôt ($)<input id="d-dep" type="number" min="0" step="any" inputmode="decimal" class="field" placeholder="0"></label>
       <label class="lbl">Retrait ($)<input id="d-wd" type="number" min="0" step="any" inputmode="decimal" class="field" placeholder="0"></label>
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <label class="lbl">Début d'activité<input id="d-start" type="time" step="60" class="field"></label>
-      <label class="lbl">Fin d'activité<input id="d-end" type="time" step="60" class="field"></label>
     </div>
     <div class="grid grid-cols-2 gap-3">
       <label class="lbl">Buy ouverts<input id="d-bo" type="number" min="0" step="1" class="field" placeholder="0"></label>
@@ -261,38 +279,34 @@
 
 <script>
 /* =====================================================================
-   Suivi du bot · compte USC — JavaScript natif (aucune dépendance)
+   Suivi du bot · compte USC
    ===================================================================== */
-const SETTINGS_KEY = 'tb_github_settings_v1';
+const SETTINGS_KEY = 'tb_github_settings_v2';
+const OLD_SETTINGS_KEY = 'tb_github_settings_v1';
+const DEFAULTS = { user: 'iSwaay', repo: 'iswaay.github.io', branch: 'main', file: 'SwayXAU/data.json' };
+const WIDGETS = [
+  ['stats', 'Statistiques'], ['calendar', 'Calendrier'], ['winloss', 'Jours gagnants / perdants'],
+  ['balance', 'Évolution du solde'], ['daily', 'Bénéfice par jour'], ['monthly', 'Bénéfice par mois'], ['adv', 'Statistiques avancées']
+];
 const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const MONTHS_S = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
 const WD_SHORT = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
 const USC = 100;                                   // 100 USC = 1 $
-const DEF_HOURS = { start: '08:00', end: '20:00' };
 
-/* ---------- Fausse base de données par défaut (démo) ---------- */
-function defaultData() {
-  return {
-    version: 2, updatedAt: null, botHours: { ...DEF_HOURS },
-    days: {
-      '2026-10-05': { profit: null, deposit: 250.02 },
-      '2026-10-06': { profit: 506 }, '2026-10-07': { profit: 573 },
-      '2026-10-08': { profit: 721 }, '2026-10-09': { profit: 11 },
-      '2026-10-12': { profit: 203 }, '2026-10-13': { profit: 316 },
-      '2026-10-14': { profit: 541 }, '2026-10-15': { profit: 367 }
-    }
-  };
-}
+function defaultData() { return { version: 3, updatedAt: null, days: {} }; }
 function normalize(d) {
-  d.botHours = { ...DEF_HOURS, ...(d.botHours || {}) };
+  delete d.botHours;
   if (!d.days || typeof d.days !== 'object') d.days = {};
+  Object.values(d.days).forEach(day => { delete day.start; delete day.end; });
   return d;
 }
 
 let data = defaultData();
 let sha = null;                // SHA du fichier distant (requis pour le PUT)
 let dirty = false;
+let loadedOnce = false;        // true une fois que les données distantes ont été lues
 let view = (() => { const t = new Date(); return { y: t.getFullYear(), m: t.getMonth() }; })();
-let editKey = null;            // jour en cours d'édition dans la modale
+let editKey = null;
 
 /* ---------- Utilitaires ---------- */
 const $ = id => document.getElementById(id);
@@ -303,15 +317,16 @@ const fmt = (n, dec = 2) => n.toLocaleString('fr-FR', { minimumFractionDigits: d
 const sgn = n => (n > 0 ? '+' : n < 0 ? '-' : '');
 const money = n => `${fmt(n)} $`;
 const smoney = n => `${sgn(n)}${fmt(Math.abs(n))} $`;
+const usc = n => `${fmt(n)} USC`;
+const susc = n => `${sgn(n)}${fmt(Math.abs(n))} USC`;
 const spct = n => `${sgn(n)}${fmt(Math.abs(n))} %`;
+const eqd = n => `≈ ${money(n / USC)}`;
+const seqd = n => `≈ ${smoney(n / USC)}`;
 const cls = n => (n > 0 ? 'pos' : n < 0 ? 'neg' : '');
+const dateFr = k => `${k.slice(8)}/${k.slice(5, 7)}`;
 const isWeekend = (y, m, d) => [0, 6].includes(new Date(y, m, d).getDay());
 const toNum = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
 const hasProfit = d => d && d.profit !== null && d.profit !== undefined && d.profit !== '' && isFinite(+d.profit);
-const hoursBetween = (a, b) => {
-  const [h1, m1] = a.split(':').map(Number), [h2, m2] = b.split(':').map(Number);
-  let diff = (h2 * 60 + m2) - (h1 * 60 + m1); if (diff < 0) diff += 1440; return diff / 60;
-};
 
 function toast(msg, type = 'info') {
   const colors = { success: 'border-emerald-500 text-emerald-300', error: 'border-red-500 text-red-300', info: 'border-blue-500 text-blue-300' };
@@ -328,99 +343,183 @@ function setDirty(v) {
 }
 
 function isClosed(key, day = data.days[key]) {
-  if (day && typeof day.closed === 'boolean') return day.closed;   // choix explicite
+  if (day && typeof day.closed === 'boolean') return day.closed;
   const [y, m, d] = key.split('-').map(Number);
-  return isWeekend(y, m - 1, d);                                   // sinon : week-end fermé par défaut
+  return isWeekend(y, m - 1, d);
 }
 function ensureDay(key) { if (!data.days[key]) data.days[key] = {}; return data.days[key]; }
-function cleanDay(key) {                                           // supprime les jours vides du JSON
+function cleanDay(key) {
   const d = data.days[key]; if (!d) return;
   const [y, m, dd] = key.split('-').map(Number);
   const empty = !hasProfit(d) && !(+d.deposit) && !(+d.withdraw) && !d.buyOpen && !d.buyClosed && !d.sellOpen && !d.sellClosed
-    && !d.start && !d.end && (d.closed === undefined || d.closed === isWeekend(y, m - 1, dd));
+    && (d.closed === undefined || d.closed === isWeekend(y, m - 1, dd));
   if (empty) delete data.days[key];
 }
 
-/* ---------- Calculs ---------- */
+/* ---------- Calculs (tout en USC) ---------- */
 function compute(days = data.days) {
   const keys = Object.keys(days).sort();
   let running = 0, totalProfit = 0, totalDep = 0, totalWd = 0, compound = 1;
-  const perDay = {}, profits = [];
+  const perDay = {}, series = [], balPts = [];
   keys.forEach(k => {
     const d = days[k];
     const dep = +d.deposit || 0, wd = +d.withdraw || 0;
     const has = !isClosed(k, d) && hasProfit(d);
     const profit = has ? +d.profit : 0;
-    const opening = running + (dep - wd) * USC;                    // solde de départ du jour
+    const opening = running + (dep - wd) * USC;
     const pct = has && opening > 0 ? (profit / opening) * 100 : null;
     if (pct !== null) compound *= 1 + pct / 100;
-    perDay[k] = { usd: profit / USC, pct, has };
     running = opening + profit;
     totalProfit += profit; totalDep += dep; totalWd += wd;
-    if (has) profits.push(profit);
+    perDay[k] = { usc: profit, pct, has, bal: running };
+    if (has) series.push({ k, usc: profit, pct });
+    if (has || dep || wd) balPts.push({ k, bal: running, cum: totalProfit });
   });
-  return { perDay, profits, totalProfit, totalDep, totalWd, compound, balance: totalDep * USC - totalWd * USC + totalProfit };
+  return { perDay, series, balPts, totalProfit, totalDep, totalWd, compound, balance: (totalDep - totalWd) * USC + totalProfit };
 }
 
-function activityHours() {
-  const keys = Object.keys(data.days).sort(); if (!keys.length) return 0;
-  const end = new Date(todayKey + 'T00:00:00'); let h = 0;
-  for (let d = new Date(keys[0] + 'T00:00:00'); d <= end; d.setDate(d.getDate() + 1)) {
-    const k = ymd(d.getFullYear(), d.getMonth(), d.getDate());
-    if (isClosed(k)) continue;
-    const day = data.days[k] || {};
-    h += hoursBetween(day.start || data.botHours.start, day.end || data.botHours.end);
-  }
-  return h;
-}
-
-function setVal(id, text, c = '') {
-  const el = $(id); el.textContent = text; el.classList.remove('pos', 'neg'); if (c) el.classList.add(c);
+/* ---------- Statistiques ---------- */
+function card(label, main, c = '', eq = '', span = '', extra = '') {
+  return `<div class="card stat ${span} ${extra}"><div class="l">${label}</div><div class="v ${c}">${main}</div>${eq ? `<div class="eq">${eq}</div>` : ''}</div>`;
 }
 
 function paintStats(c) {
-  const usd = c.totalProfit / USC, n = c.profits.length;
-  setVal('st-bal', money(c.balance / USC));
-  $('st-bal-usc').textContent = `(${fmt(c.balance, 0)} USC)`;
-  setVal('st-profit', smoney(usd), cls(usd));
-  const ret = c.totalDep > 0 ? (usd / c.totalDep) * 100 : 0, comp = (c.compound - 1) * 100;
-  setVal('st-ret', spct(ret), cls(ret));
-  setVal('st-comp', spct(comp), cls(comp));
-  setVal('st-dep', money(c.totalDep));
-  setVal('st-wd', money(c.totalWd));
-  const avg = n ? usd / n : 0;
-  setVal('st-avg', smoney(avg), cls(avg));
-  const w = c.profits.filter(p => p > 0).length;
-  setVal('st-win', n ? `${Math.round((w / n) * 100)} % (${w}/${n})` : '—');
-  if (n) {
-    const best = Math.max(...c.profits) / USC, worst = Math.min(...c.profits) / USC;
-    setVal('st-best', smoney(best), cls(best)); setVal('st-worst', smoney(worst), cls(worst));
-  } else { setVal('st-best', '—'); setVal('st-worst', '—'); }
-  setVal('st-hours', `${fmt(activityHours(), 1)} h`);
+  const s = c.series, n = s.length;
+  const ret = c.totalDep > 0 ? (c.totalProfit / USC / c.totalDep) * 100 : 0, comp = (c.compound - 1) * 100;
+  const pcts = s.filter(x => x.pct !== null).map(x => x.pct);
+  const avgUsc = n ? c.totalProfit / n : 0, avgPct = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : 0;
+  let best = null, worst = null;
+  s.forEach(x => { if (!best || x.usc > best.usc) best = x; if (!worst || x.usc < worst.usc) worst = x; });
   let bo = 0, bc = 0, so = 0, sc = 0;
   Object.values(data.days).forEach(d => { bo += +d.buyOpen || 0; bc += +d.buyClosed || 0; so += +d.sellOpen || 0; sc += +d.sellClosed || 0; });
-  setVal('st-buy', `${bo} / ${bc}`); setVal('st-sell', `${so} / ${sc}`);
+
+  $('stats-grid').innerHTML = [
+    card('Solde actuel', usc(c.balance), '', eqd(c.balance), 'span2', 'big'),
+    card('Bénéfice total', susc(c.totalProfit), cls(c.totalProfit), seqd(c.totalProfit), 'span2', 'big'),
+    card('Rendement sur dépôts', spct(ret), cls(ret)),
+    card('Rendement composé', spct(comp), cls(comp)),
+    card('Total déposé', usc(c.totalDep * USC), '', eqd(c.totalDep * USC), 'span2'),
+    card('Total retiré', usc(c.totalWd * USC), '', eqd(c.totalWd * USC), 'span2'),
+    card('Moyenne / jour', n ? susc(avgUsc) : '—', cls(avgUsc), n ? `${spct(avgPct)} · ${seqd(avgUsc)}` : '', 'span2'),
+    card('Meilleur jour', best ? susc(best.usc) : '—', best ? cls(best.usc) : '', best ? `${dateFr(best.k)} · ${seqd(best.usc)}` : '', 'span2'),
+    card('Pire jour', worst ? susc(worst.usc) : '—', worst ? cls(worst.usc) : '', worst ? `${dateFr(worst.k)} · ${seqd(worst.usc)}` : '', 'span2'),
+    card('Buy ouverts / fermés', `${bo} / ${bc}`, '', '', 'span2'),
+    card('Sell ouverts / fermés', `${so} / ${sc}`, '', '', 'span2')
+  ].join('');
+
+  paintWinLoss(s);
+  paintAdv(c);
+}
+
+function paintWinLoss(s) {
+  const w = s.filter(x => x.usc > 0), l = s.filter(x => x.usc < 0), z = s.length - w.length - l.length, n = s.length;
+  if (!n) { $('wl-body').innerHTML = '<p class="text-sm" style="color:var(--mut)">Aucun jour renseigné pour le moment.</p>'; return; }
+  const pw = (w.length / n) * 100, pl = (l.length / n) * 100;
+  const sumW = w.reduce((a, x) => a + x.usc, 0), sumL = l.reduce((a, x) => a + x.usc, 0);
+  $('wl-body').innerHTML = `
+    <div class="flex flex-wrap items-end justify-between gap-3 mb-3">
+      <div><div class="text-xs font-semibold" style="color:var(--mut)">Taux de réussite</div><div class="text-2xl font-extrabold">${fmt(pw, 0)} %</div></div>
+      <div class="text-sm font-bold flex gap-5">
+        <span class="pos">${w.length} gagnant${w.length > 1 ? 's' : ''} · ${susc(sumW)}</span>
+        <span class="neg">${l.length} perdant${l.length > 1 ? 's' : ''} · ${susc(sumL)}</span>
+        ${z ? `<span style="color:var(--mut)">${z} neutre${z > 1 ? 's' : ''}</span>` : ''}
+      </div>
+    </div>
+    <div class="wl-bar mb-4"><div style="width:${pw}%;background:var(--green)"></div><div style="width:${pl}%;background:var(--red)"></div></div>
+    <div class="wl-strip">${s.map(x => `<i title="${dateFr(x.k)} : ${susc(x.usc)}" style="background:${x.usc > 0 ? 'var(--green)' : x.usc < 0 ? 'var(--red)' : '#4a5a7a'}"></i>`).join('')}</div>`;
+}
+
+function paintAdv(c) {
+  const s = c.series, w = s.filter(x => x.usc > 0), l = s.filter(x => x.usc < 0);
+  if (!s.length) { $('adv-grid').innerHTML = '<p class="text-sm col-span-full" style="color:var(--mut)">Aucune donnée pour le moment.</p>'; return; }
+  const sumW = w.reduce((a, x) => a + x.usc, 0), sumL = l.reduce((a, x) => a + x.usc, 0);
+  const avgW = w.length ? sumW / w.length : 0, avgL = l.length ? sumL / l.length : 0;
+  let bw = 0, bl = 0, cw = 0, cl = 0;
+  s.forEach(x => {
+    if (x.usc > 0) { cw++; cl = 0; } else if (x.usc < 0) { cl++; cw = 0; } else { cw = 0; cl = 0; }
+    bw = Math.max(bw, cw); bl = Math.max(bl, cl);
+  });
+  const cur = cw ? `${cw} gagnant${cw > 1 ? 's' : ''}` : cl ? `${cl} perdant${cl > 1 ? 's' : ''}` : '—';
+  let cum = 0, peak = 0, dd = 0;
+  s.forEach(x => { cum += x.usc; peak = Math.max(peak, cum); dd = Math.max(dd, peak - cum); });
+  const pf = sumL < 0 ? fmt(sumW / Math.abs(sumL)) : '—';
+  const rr = avgL < 0 ? fmt(avgW / Math.abs(avgL)) : '—';
+  $('adv-grid').innerHTML = [
+    card('Jours tradés', String(s.length), '', '', '', 'mini'),
+    card('Gain moyen', w.length ? susc(avgW) : '—', 'pos', w.length ? seqd(avgW) : '', '', 'mini'),
+    card('Perte moyenne', l.length ? susc(avgL) : '—', 'neg', l.length ? seqd(avgL) : '', '', 'mini'),
+    card('Profit factor', pf, '', 'gains ÷ pertes', '', 'mini'),
+    card('Ratio gain / perte', rr, '', 'gain moyen ÷ perte moyenne', '', 'mini'),
+    card('Série gagnante max', `${bw} j`, 'pos', '', '', 'mini'),
+    card('Série perdante max', `${bl} j`, bl ? 'neg' : '', '', '', 'mini'),
+    card('Série en cours', cur, cw ? 'pos' : cl ? 'neg' : '', '', '', 'mini'),
+    card('Drawdown max', dd ? `-${fmt(dd)} USC` : '0,00 USC', dd ? 'neg' : '', `sur le bénéfice cumulé · ${eqd(dd)}`, 'span2', 'mini')
+  ].join('');
+}
+
+/* ---------- Graphiques ---------- */
+const charts = {};
+function mkChart(id, cfg) {
+  if (typeof Chart === 'undefined') return;
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart($(id), cfg);
+}
+function chartOpts(legend, tipExtra) {
+  const axis = { ticks: { color: '#8394b3', font: { family: 'Manrope', size: 11 }, maxRotation: 0, autoSkip: true }, grid: { color: 'rgba(31,46,77,.7)' } };
+  return {
+    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: legend, labels: { color: '#8394b3', font: { family: 'Manrope' } } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label} : ${susc(ctx.parsed.y).replace(/^\+/, '')}${tipExtra ? tipExtra(ctx) : ''}` } }
+    },
+    scales: { x: axis, y: axis }
+  };
+}
+function paintCharts(c) {
+  mkChart('ch-bal', {
+    type: 'line',
+    data: {
+      labels: c.balPts.map(p => dateFr(p.k)),
+      datasets: [
+        { label: 'Solde', data: c.balPts.map(p => p.bal), borderColor: '#5b8def', backgroundColor: 'rgba(91,141,239,.15)', fill: true, tension: .25, pointRadius: 2 },
+        { label: 'Bénéfice cumulé', data: c.balPts.map(p => p.cum), borderColor: '#34d399', borderDash: [5, 4], tension: .25, pointRadius: 0 }
+      ]
+    },
+    options: chartOpts(true)
+  });
+  const s = c.series;
+  mkChart('ch-day', {
+    type: 'bar',
+    data: { labels: s.map(x => dateFr(x.k)), datasets: [{ label: 'Bénéfice', data: s.map(x => x.usc), backgroundColor: s.map(x => x.usc >= 0 ? '#34d399' : '#f87171'), borderRadius: 4 }] },
+    options: chartOpts(false, ctx => { const p = s[ctx.dataIndex].pct; return p !== null ? ` (${spct(p)})` : ''; })
+  });
+  const mm = {};
+  s.forEach(x => { const k = x.k.slice(0, 7); mm[k] = (mm[k] || 0) + x.usc; });
+  const mk = Object.keys(mm).sort();
+  mkChart('ch-month', {
+    type: 'bar',
+    data: { labels: mk.map(k => `${MONTHS_S[+k.slice(5) - 1]} ${k.slice(0, 4)}`), datasets: [{ label: 'Bénéfice', data: mk.map(k => mm[k]), backgroundColor: mk.map(k => mm[k] >= 0 ? '#34d399' : '#f87171'), borderRadius: 4 }] },
+    options: chartOpts(false)
+  });
 }
 
 /* ---------- Calendrier ---------- */
 function renderCalendar() {
   const c = compute();
   paintStats(c);
+  paintCharts(c);
   $('month-title').textContent = `${MONTHS[view.m]} ${view.y}`;
-  $('bot-start').value = data.botHours.start; $('bot-end').value = data.botHours.end;
 
-  // Résumé du mois : bénéfice + rendement composé du mois
   const prefix = `${view.y}-${pad(view.m + 1)}-`;
-  let mUsd = 0, mComp = 1;
+  let mUsc = 0, mComp = 1;
   Object.keys(c.perDay).filter(k => k.startsWith(prefix)).forEach(k => {
-    const p = c.perDay[k]; mUsd += p.usd; if (p.pct !== null) mComp *= 1 + p.pct / 100;
+    const p = c.perDay[k]; mUsc += p.usc; if (p.pct !== null) mComp *= 1 + p.pct / 100;
   });
-  const mPct = (mComp - 1) * 100;
-  $('month-sum').textContent = `${smoney(mUsd)} · ${spct(mPct)}`;
-  $('month-sum').className = `text-sm font-bold ${cls(mUsd)}`;
+  $('month-sum').textContent = `${susc(mUsc)} · ${spct((mComp - 1) * 100)}`;
+  $('month-sum').className = `text-sm font-bold ${cls(mUsc)}`;
 
   const grid = $('grid'); grid.innerHTML = '';
-  const offset = (new Date(view.y, view.m, 1).getDay() + 6) % 7;   // Lundi = 0
+  const offset = (new Date(view.y, view.m, 1).getDay() + 6) % 7;
   const nb = new Date(view.y, view.m + 1, 0).getDate();
   for (let i = 0; i < offset; i++) { const e = document.createElement('div'); e.className = 'empty-cell'; grid.appendChild(e); }
 
@@ -430,18 +529,18 @@ function renderCalendar() {
     const wdName = WD_SHORT[new Date(view.y, view.m, d).getDay()];
     const hasTrades = day.buyOpen || day.buyClosed || day.sellOpen || day.sellClosed;
     let state = '';
-    if (closed) state = 'closed'; else if (p && p.has) state = p.usd > 0 ? 'win' : p.usd < 0 ? 'loss' : '';
+    if (closed) state = 'closed'; else if (p && p.has) state = p.usc > 0 ? 'win' : p.usc < 0 ? 'loss' : '';
 
     const el = document.createElement('button');
     el.type = 'button'; el.dataset.day = k;
     el.className = `cell ${state} ${k === todayKey ? 'today' : ''}`;
     el.innerHTML = `
       <div class="flex justify-between items-baseline"><span class="dn">${d}</span><span class="text-[10px] sm:hidden" style="color:var(--mut)">${wdName}</span></div>
-      ${closed ? '<div class="mf">Marché fermé</div>' : `<div class="hrs">${day.start || data.botHours.start}-${day.end || data.botHours.end}</div>`}
-      ${dep ? `<div class="sub">Dépôt ${money(dep)}</div>` : ''}
-      ${wd ? `<div class="sub">Retrait ${money(wd)}</div>` : ''}
+      ${closed ? '<div class="mf">Marché fermé</div>' : ''}
+      ${dep ? `<div class="sub">Dépôt ${usc(dep * USC)}</div>` : ''}
+      ${wd ? `<div class="sub">Retrait ${usc(wd * USC)}</div>` : ''}
       ${!closed && hasTrades ? `<div class="sub">B ${day.buyOpen || 0}/${day.buyClosed || 0} · S ${day.sellOpen || 0}/${day.sellClosed || 0}</div>` : ''}
-      ${p && p.has ? `<div class="pv">${smoney(p.usd)}</div>${p.pct !== null ? `<div class="pp">${spct(p.pct)}</div>` : ''}` : ''}`;
+      ${p && p.has ? `<div class="pv">${susc(p.usc)}</div>${p.pct !== null ? `<div class="pp">${spct(p.pct)}</div>` : ''}` : ''}`;
     grid.appendChild(el);
   }
 }
@@ -451,29 +550,14 @@ function shiftMonth(n) { const d = new Date(view.y, view.m + n, 1); view = { y: 
 $('prev').onclick = () => shiftMonth(-1);
 $('next').onclick = () => shiftMonth(1);
 
-/* Barre d'outils du calendrier */
 $('btn-wk').onclick = () => {
   const nb = new Date(view.y, view.m + 1, 0).getDate();
   for (let d = 1; d <= nb; d++) if (isWeekend(view.y, view.m, d)) ensureDay(ymd(view.y, view.m, d)).closed = true;
   setDirty(true); renderCalendar(); toast('Week-ends du mois marqués comme fermés.', 'success');
 };
-['bot-start', 'bot-end'].forEach(id => $(id).addEventListener('change', () => {
-  if (!$('bot-start').value || !$('bot-end').value) return;
-  data.botHours = { start: $('bot-start').value, end: $('bot-end').value };
-  setDirty(true); renderCalendar();
-}));
-$('btn-apply').onclick = () => {
-  const nb = new Date(view.y, view.m + 1, 0).getDate(); let n = 0;
-  for (let d = 1; d <= nb; d++) {
-    const k = ymd(view.y, view.m, d);
-    if (!isClosed(k) && data.days[k]) { delete data.days[k].start; delete data.days[k].end; n++; }
-  }
-  Object.keys(data.days).forEach(cleanDay);
-  setDirty(true); renderCalendar(); toast(`Horaires ${data.botHours.start}-${data.botHours.end} appliqués aux jours ouvrés du mois.`, 'success');
-};
 
 /* ---------- Modale d'édition d'un jour ---------- */
-const DF = { closed: 'd-closed', profit: 'd-profit', dep: 'd-dep', wd: 'd-wd', start: 'd-start', end: 'd-end', bo: 'd-bo', bc: 'd-bc', so: 'd-so', sc: 'd-sc' };
+const DF = ['d-closed', 'd-profit', 'd-dep', 'd-wd', 'd-bo', 'd-bc', 'd-so', 'd-sc'];
 
 function openDay(key) {
   editKey = key; const d = data.days[key] || {}, [y, m, dd] = key.split('-').map(Number);
@@ -481,7 +565,6 @@ function openDay(key) {
   $('d-closed').checked = isClosed(key);
   $('d-profit').value = hasProfit(d) ? d.profit : '';
   $('d-dep').value = d.deposit || ''; $('d-wd').value = d.withdraw || '';
-  $('d-start').value = d.start || data.botHours.start; $('d-end').value = d.end || data.botHours.end;
   $('d-bo').value = d.buyOpen || ''; $('d-bc').value = d.buyClosed || ''; $('d-so').value = d.sellOpen || ''; $('d-sc').value = d.sellClosed || '';
   syncDayModal(); $('day-modal').classList.remove('hidden');
 }
@@ -490,23 +573,22 @@ function readDraft() {
   return {
     closed: $('d-closed').checked, profit: toNum($('d-profit').value),
     deposit: Math.max(0, toNum($('d-dep').value) || 0), withdraw: Math.max(0, toNum($('d-wd').value) || 0),
-    start: $('d-start').value, end: $('d-end').value,
     buyOpen: iv('d-bo'), buyClosed: iv('d-bc'), sellOpen: iv('d-so'), sellClosed: iv('d-sc')
   };
 }
 function syncDayModal() {
   const dr = readDraft();
-  ['d-profit', 'd-start', 'd-end', 'd-bo', 'd-bc', 'd-so', 'd-sc'].forEach(id => $(id).disabled = dr.closed);
+  ['d-profit', 'd-bo', 'd-bc', 'd-so', 'd-sc'].forEach(id => $(id).disabled = dr.closed);
   const lbl = $('d-closed-lbl'); lbl.textContent = dr.closed ? 'Marché fermé (WK)' : 'Marché ouvert';
   lbl.style.color = dr.closed ? 'var(--red)' : '';
-  // Aperçu en temps réel ($ et % du jour)
   const p = compute({ ...data.days, [editKey]: dr }).perDay[editKey], pv = $('d-prev');
   if (p && p.has) {
-    pv.className = `text-sm font-bold mt-1.5 min-h-[1.25rem] ${cls(p.usd)}`;
-    pv.textContent = `${smoney(p.usd)}${p.pct !== null ? ' · ' + spct(p.pct) : ''}`;
+    pv.className = `text-sm font-bold mt-1.5 min-h-[1.25rem] ${cls(p.usc)}`;
+    pv.style.color = '';
+    pv.textContent = `${susc(p.usc)}${p.pct !== null ? ' · ' + spct(p.pct) : ''}`;
   } else { pv.className = 'text-sm font-bold mt-1.5 min-h-[1.25rem]'; pv.style.color = 'var(--mut)'; pv.textContent = dr.closed ? '' : '—'; }
 }
-Object.values(DF).forEach(id => $(id).addEventListener('input', syncDayModal));
+DF.forEach(id => $(id).addEventListener('input', syncDayModal));
 $('d-closed').addEventListener('change', syncDayModal);
 
 const closeDay = () => { $('day-modal').classList.add('hidden'); editKey = null; };
@@ -518,9 +600,6 @@ $('day-form').addEventListener('submit', e => {
   const dr = readDraft(), day = ensureDay(editKey);
   Object.assign(day, { closed: dr.closed, profit: dr.profit, deposit: dr.deposit, withdraw: dr.withdraw,
     buyOpen: dr.buyOpen, buyClosed: dr.buyClosed, sellOpen: dr.sellOpen, sellClosed: dr.sellClosed });
-  // Horaires : stockés uniquement s'ils diffèrent des horaires par défaut du bot
-  if (dr.start && dr.start !== data.botHours.start) day.start = dr.start; else delete day.start;
-  if (dr.end && dr.end !== data.botHours.end) day.end = dr.end; else delete day.end;
   cleanDay(editKey); setDirty(true); closeDay(); renderCalendar();
 });
 
@@ -536,34 +615,57 @@ $('modal-form').addEventListener('submit', e => {
   day[f] = (+day[f] || 0) + amount;
   const [y, m] = date.split('-').map(Number); view = { y, m: m - 1 };
   $('modal').classList.add('hidden'); setDirty(true); renderCalendar();
-  toast(`${f === 'deposit' ? 'Dépôt' : 'Retrait'} de ${money(amount)} ajouté au ${date}.`, 'success');
+  toast(`${f === 'deposit' ? 'Dépôt' : 'Retrait'} de ${money(amount)} (${usc(amount * USC)}) ajouté au ${date}.`, 'success');
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDay(); $('modal').classList.add('hidden'); $('menu').classList.add('hidden'); } });
 
+/* ---------- Widgets repliables ---------- */
+document.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => {
+  b.closest('.wgt').classList.toggle('closed');
+  Object.values(charts).forEach(ch => ch.resize());
+});
+function applyWidgetDefaults() {
+  const open = loadSettings().open || {};
+  document.querySelectorAll('.wgt').forEach(w => w.classList.toggle('closed', open[w.dataset.w] === false));
+}
+
 /* ---------- Navigation latérale ---------- */
 function showSection(name) {
-  if (!['history', 'live', 'settings'].includes(name)) name = 'history';
-  ['history', 'live', 'settings'].forEach(s => $('sec-' + s).classList.toggle('hidden', s !== name));
+  if (!['history', 'settings'].includes(name)) name = 'history';
+  ['history', 'settings'].forEach(s => $('sec-' + s).classList.toggle('hidden', s !== name));
   document.querySelectorAll('[data-nav]').forEach(b => b.classList.toggle('active', b.dataset.nav === name));
   try { history.replaceState(null, '', '#' + name); } catch {}
   window.scrollTo({ top: 0 });
+  Object.values(charts).forEach(ch => ch.resize());
 }
 document.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => showSection(b.dataset.nav));
 
 /* ---------- Réglages (localStorage) ---------- */
 const FIELDS = { user: 's-user', repo: 's-repo', branch: 's-branch', file: 's-file', token: 's-token' };
-function loadSettings() { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch { return {}; } }
-function getSettings() {
-  const s = {}; for (const k in FIELDS) s[k] = $(FIELDS[k]).value.trim();
-  if (!s.branch) s.branch = 'main'; return s;
+function loadSettings() {
+  try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); if (s) return s; } catch {}
+  try { const o = JSON.parse(localStorage.getItem(OLD_SETTINGS_KEY)) || {}; return { token: o.token || '' }; } catch { return {}; }
 }
-function saveSettings() {
+function readUI() {
   const s = {}; for (const k in FIELDS) s[k] = $(FIELDS[k]).value.trim();
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch { toast('Impossible d’enregistrer les réglages localement.', 'error'); }
+  for (const k in DEFAULTS) if (!s[k]) s[k] = DEFAULTS[k];
+  s.open = {}; WIDGETS.forEach(([id]) => s.open[id] = $('o-' + id).checked);
+  return s;
+}
+const getSettings = readUI;
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(readUI())); } catch { toast('Impossible d’enregistrer les réglages localement.', 'error'); }
 }
 function initSettings() {
-  const s = loadSettings();
-  for (const k in FIELDS) { $(FIELDS[k]).value = s[k] || ''; $(FIELDS[k]).addEventListener('input', saveSettings); }
+  const s = loadSettings(), open = s.open || {};
+  $('widget-opts').innerHTML = WIDGETS.map(([id, t]) =>
+    `<label class="flex items-center gap-2.5 text-sm font-semibold cursor-pointer"><input type="checkbox" id="o-${id}" class="accent-blue-500 w-4 h-4" ${open[id] === false ? '' : 'checked'}>${t}</label>`).join('');
+  WIDGETS.forEach(([id]) => $('o-' + id).addEventListener('change', saveSettings));
+  for (const k in FIELDS) {
+    $(FIELDS[k]).value = s[k] || DEFAULTS[k] || '';
+    $(FIELDS[k]).addEventListener('input', saveSettings);
+  }
+  $('s-token').addEventListener('change', () => { if (!loadedOnce && $('s-token').value.trim()) loadFromGitHub(true); });
   $('tok-eye').onclick = () => {
     const t = $('s-token'), hide = t.type === 'password';
     t.type = hide ? 'text' : 'password'; $('tok-eye').textContent = hide ? 'Masquer' : 'Afficher';
@@ -588,12 +690,17 @@ async function loadFromGitHub(silent = false) {
   if (!configured(s)) { if (!silent) toast('Veuillez remplir les réglages GitHub (pseudo, dépôt, fichier).', 'info'); return false; }
   try {
     const r = await fetch(`${apiUrl(s)}?ref=${encodeURIComponent(s.branch)}&_=${Date.now()}`, { headers: headers(s), cache: 'no-store' });
-    if (r.status === 404) { sha = null; toast('Fichier introuvable sur GitHub : il sera créé à l’enregistrement.', 'info'); return false; }
+    if (r.status === 404) {
+      sha = null;
+      if (s.token) { loadedOnce = true; toast('Fichier introuvable sur GitHub : il sera créé à l’enregistrement.', 'info'); }
+      else toast('Fichier introuvable (ou dépôt privé) : renseignez votre token dans les Réglages.', 'info');
+      return false;
+    }
     if (r.status === 401 || r.status === 403) throw new Error('Accès refusé (token invalide ou droits insuffisants).');
     if (!r.ok) throw new Error(`Erreur GitHub ${r.status}`);
     const j = await r.json(), parsed = JSON.parse(b64decode(j.content));
     if (!parsed || typeof parsed.days !== 'object') throw new Error('Format de fichier JSON invalide.');
-    data = normalize(parsed); sha = j.sha; setDirty(false); renderCalendar();
+    data = normalize(parsed); sha = j.sha; loadedOnce = true; setDirty(false); renderCalendar();
     toast('Données chargées depuis GitHub ✔', 'success'); return true;
   } catch (e) { toast('Échec du chargement : ' + e.message, 'error'); return false; }
 }
@@ -601,21 +708,23 @@ async function loadFromGitHub(silent = false) {
 async function saveToGitHub(retry = true) {
   const s = getSettings();
   if (!configured(s)) return toast('Réglages GitHub incomplets : ouvrez la section Réglages.', 'error');
-  if (!s.token) return toast('Le token d’accès est requis pour enregistrer.', 'error');
+  if (!s.token) return toast('Le token d’accès est requis pour enregistrer (section Réglages).', 'error');
   $('btn-save').disabled = true; $('save-spin').classList.remove('hidden');
   try {
-    // SHA le plus récent pour écraser proprement le fichier
     const g = await fetch(`${apiUrl(s)}?ref=${encodeURIComponent(s.branch)}&_=${Date.now()}`, { headers: headers(s), cache: 'no-store' });
-    if (g.ok) sha = (await g.json()).sha; else if (g.status === 404) sha = null;
+    if (g.ok) {
+      if (!loadedOnce && !confirm('Les données du dépôt n’ont pas été chargées dans cette page. Enregistrer va les ÉCRASER. Continuer ?')) throw new Error('Enregistrement annulé.');
+      sha = (await g.json()).sha;
+    } else if (g.status === 404) sha = null;
     else if (g.status === 401 || g.status === 403) throw new Error('Accès refusé (vérifiez le token : Contents lecture/écriture).');
 
     data.updatedAt = new Date().toISOString();
     const body = { message: `Mise à jour des données du bot (${new Date().toLocaleString('fr-FR')})`, content: b64encode(JSON.stringify(data, null, 2)), branch: s.branch };
     if (sha) body.sha = sha;
     const r = await fetch(apiUrl(s), { method: 'PUT', headers: { ...headers(s), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (r.status === 409 || r.status === 422) { if (retry) return saveToGitHub(false); throw new Error('Conflit de version : rechargez les données puis réessayez.'); }
+    if (r.status === 409 || r.status === 422) { if (retry) { $('btn-save').disabled = false; return saveToGitHub(false); } throw new Error('Conflit de version : rechargez les données puis réessayez.'); }
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.message || `Erreur GitHub ${r.status}`); }
-    sha = (await r.json()).content.sha; setDirty(false);
+    sha = (await r.json()).content.sha; loadedOnce = true; setDirty(false);
     toast('Données enregistrées sur GitHub ✔', 'success');
   } catch (e) { toast('Échec de l’enregistrement : ' + e.message, 'error'); }
   finally { $('btn-save').disabled = false; $('save-spin').classList.add('hidden'); }
@@ -628,7 +737,6 @@ function exportJson() {
 }
 function reload() { if (dirty && !confirm('Des modifications non enregistrées seront écrasées. Continuer ?')) return; loadFromGitHub(); }
 
-/* Bouton « Enregistrer » + menu déroulant */
 $('btn-save').onclick = () => saveToGitHub();
 $('btn-save2').onclick = () => saveToGitHub();
 $('btn-load').onclick = reload;
@@ -643,11 +751,12 @@ window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); 
 
 /* ---------- Démarrage ---------- */
 initSettings();
+applyWidgetDefaults();
 showSection((location.hash || '').replace('#', ''));
 renderCalendar();
 (async () => {
   const ok = await loadFromGitHub(true);
-  if (!ok && !configured(getSettings())) toast('GitHub non configuré : renseignez la section Réglages pour synchroniser. Données de démonstration affichées.', 'info');
+  if (!ok && !loadedOnce && !getSettings().token) toast('Renseignez votre token dans les Réglages pour charger et enregistrer vos données.', 'info');
 })();
 </script>
 </body>
